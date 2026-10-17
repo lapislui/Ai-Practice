@@ -1,12 +1,10 @@
 import AI_data as aid
 
-loader = aid.LoadData("polling_on_ai_usage_jul_2026.csv")
+loader = aid.LoadData("https://raw.githubusercontent.com/mwaskom/seaborn-data/master/penguins.csv")
 df = loader.read()
 
 # loader.help()
 # loader.help("read")
-
-
 
 data = aid.DataDefinition(df)
 
@@ -16,3 +14,8 @@ data = aid.DataDefinition(df)
 
 # print(data.shape())
 # print(data.sample(3))
+# print(data.info())
+
+uni = aid.Univariate(df)
+
+uni.help()

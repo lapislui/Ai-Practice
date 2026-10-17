@@ -25,3 +25,29 @@ print(data.sample(5))
 # print(data.duplicates())
 # print(data.unique_values())
 # print(data.memory_usage())
+
+
+# Create univariate object
+uni = aid.Univariate(df)
+
+# Show all available methods
+uni.help()
+
+# Get help for an individual method
+uni.help("value_counts")
+uni.help("skewness")
+
+# Statistical analysis
+print(uni.value_counts("Sex"))
+print(uni.summary("Age"))
+print(uni.minimum("Age"))
+print(uni.maximum("Age"))
+print(uni.mean("Age"))
+print(uni.median("Age"))
+print(uni.skewness("Age"))
+
+# Visualizations
+uni.countplot("Embarked")
+uni.pie_chart("Sex")
+uni.histogram("Age")
+uni.boxplot("Age")

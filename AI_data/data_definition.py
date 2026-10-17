@@ -3,10 +3,45 @@ from .help import Help
 
 class DataDefinition(Help):
     methods = {
+        # Object display methods
+        "__str__": {
+            "description": "Display a readable dataset summary.",
+            "parameters": "None.",
+            "returns": "String containing rows, columns, and column names.",
+            "example": "print(data)"
+        },
+        "__repr__": {
+            "description": "Display a short representation of the object.",
+            "parameters": "None.",
+            "returns": "String showing the number of rows and columns.",
+            "example": "repr(data)"
+        },
+
+        # Special methods
+        "__len__": {
+            "description": "Get the number of rows in the dataset.",
+            "parameters": "None.",
+            "returns": "Integer representing the number of rows.",
+            "example": "len(data)"
+        },
+        "__getitem__": {
+            "description": "Select a column using its name.",
+            "parameters": "column: name of the column.",
+            "returns": "Pandas Series for the selected column.",
+            "example": "data['Age']"
+        },
+        "__contains__": {
+            "description": "Check whether a column exists.",
+            "parameters": "column: name of the column.",
+            "returns": "Boolean: True or False.",
+            "example": "'Age' in data"
+        },
+
+        # Data definition methods
         "shape": {
             "description": "Get the number of rows and columns.",
             "parameters": "None.",
-            "returns": "Tuple of rows and columns.",
+            "returns": "Tuple containing (rows, columns).",
             "example": "data.shape()"
         },
         "columns": {
@@ -16,16 +51,66 @@ class DataDefinition(Help):
             "example": "data.columns()"
         },
         "sample": {
-            "description": "Get random rows.",
-            "parameters": "n=5: number of rows.",
-            "returns": "Pandas DataFrame.",
+            "description": "Get random rows from the dataset.",
+            "parameters": "n=5: number of rows to return.",
+            "returns": "Pandas DataFrame containing sampled rows.",
             "example": "data.sample(3)"
         },
-        "missing_values": {
-            "description": "Count missing values per column.",
+        "data_types": {
+            "description": "Get the data type of each column.",
             "parameters": "None.",
-            "returns": "Pandas Series.",
+            "returns": "Pandas Series containing column data types.",
+            "example": "data.data_types()"
+        },
+        "info": {
+            "description": "Display column names, data types, and non-null counts.",
+            "parameters": "None.",
+            "returns": "None; prints information directly.",
+            "example": "data.info()"
+        },
+        "describe": {
+            "description": "Get statistical summaries of columns.",
+            "parameters": "None.",
+            "returns": "DataFrame containing descriptive statistics.",
+            "example": "data.describe()"
+        },
+        "missing_values": {
+            "description": "Count missing values in each column.",
+            "parameters": "None.",
+            "returns": "Pandas Series containing missing-value counts.",
             "example": "data.missing_values()"
+        },
+        "missing_percentage": {
+            "description": "Calculate the percentage of missing values in each column.",
+            "parameters": "None.",
+            "returns": "Pandas Series containing percentages.",
+            "example": "data.missing_percentage()"
+        },
+        "duplicates": {
+            "description": "Count duplicate rows in the dataset.",
+            "parameters": "None.",
+            "returns": "Integer representing the number of duplicate rows.",
+            "example": "data.duplicates()"
+        },
+        "unique_values": {
+            "description": "Count unique values in each column.",
+            "parameters": "None.",
+            "returns": "Pandas Series containing unique-value counts.",
+            "example": "data.unique_values()"
+        },
+        "memory_usage": {
+            "description": "Calculate the memory used by the dataset.",
+            "parameters": "None.",
+            "returns": "Memory usage in KB, rounded to two decimal places.",
+            "example": "data.memory_usage()"
+        },
+
+        # Inherited help method
+        "help": {
+            "description": "Display help for all methods or one specific method.",
+            "parameters": "method=None: optional method name.",
+            "returns": "None; prints method documentation.",
+            "example": "data.help()\ndata.help('sample')"
         }
     }
 
@@ -59,12 +144,14 @@ class DataDefinition(Help):
 
     # Data definition methods
     def shape(self):
-        return self.df.shape
+        # print("Shape is")
+        return f"Shae is {self.df.shape}"
 
     def columns(self):
         return self.df.columns.tolist()
 
     def sample(self, n=5):
+        print("Sample is ")
         return self.df.sample(
             n=min(n, len(self.df)),
             random_state=42
