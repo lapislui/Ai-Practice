@@ -51,3 +51,64 @@ uni.countplot("Embarked")
 uni.pie_chart("Sex")
 uni.histogram("Age")
 uni.boxplot("Age")
+
+bi = aid.Bivariate(df)
+
+# Help for all methods
+bi.help()
+
+# Help for individual methods
+bi.help("scatterplot")
+bi.help("heatmap")
+bi.help("correlation")
+
+# Numerical vs numerical
+print(bi.correlation())
+bi.scatterplot("Age", "Fare")
+
+# Numerical vs categorical
+bi.barplot("Sex", "Age")
+bi.boxplot("Sex", "Age")
+bi.kdeplot("Age", hue="Survived")
+
+# Categorical vs categorical
+print(bi.crosstab("Pclass", "Survived"))
+bi.heatmap("Pclass", "Survived")
+
+# Multiple numerical columns
+bi.pairplot(columns=["Age", "Fare"])
+
+# Grouped analysis
+print(bi.group_summary("Sex", "Age"))
+
+
+
+
+bi = aid.Bivariate(df)
+
+# Help for all methods
+bi.help()
+
+# Help for individual methods
+bi.help("scatterplot")
+bi.help("heatmap")
+bi.help("correlation")
+
+# Numerical vs numerical
+print(bi.correlation())
+bi.scatterplot("Age", "Fare")
+
+# Numerical vs categorical
+bi.barplot("Sex", "Age")
+bi.boxplot("Sex", "Age")
+bi.kdeplot("Age", hue="Survived")
+
+# Categorical vs categorical
+print(bi.crosstab("Pclass", "Survived"))
+bi.heatmap("Pclass", "Survived")
+
+# Multiple numerical columns
+bi.pairplot(columns=["Age", "Fare"])
+
+# Grouped analysis
+print(bi.group_summary("Sex", "Age"))
