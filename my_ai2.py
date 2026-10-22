@@ -1,7 +1,7 @@
 import AI_data as aid
 
 # Load data
-loader = aid.LoadData("polling_on_ai_usage_jul_2026.csv")
+loader = aid.LoadData("employee_data_practice.csv")
 df = loader.read()
 
 # Create univariate object
@@ -15,4 +15,4 @@ uni = aid.Univariate(df)
  
 # uni.value_counts("")
 
-data.info()
+df.info()
