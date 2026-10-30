@@ -1,7 +1,17 @@
-"""Simple linear regression trained with gradient descent.
+"""Simple linear regression using scikit-learn's SGDRegressor.
 
-Designed for the AI_data learning package. Uses NumPy/Pandas/Matplotlib and
-does not use scikit-learn to fit the regression model.
+This implementation uses stochastic gradient descent (SGD) to learn a one-feature
+linear model and scikit-learn metrics to evaluate predictions.
+
+Public API:
+    SimpleLinearRegression.fit(X, y, ...)
+    SimpleLinearRegression.predict(X)
+    SimpleLinearRegression.evaluate(X, y_true)
+    SimpleLinearRegression.metrics(y_true, y_pred)
+    SimpleLinearRegression.residuals(X, y_true)
+    SimpleLinearRegression.plot_regression(X, y)
+    SimpleLinearRegression.plot_loss()
+    SimpleLinearRegression.plot_residuals(X, y_true)
 """
 
 from __future__ import annotations
@@ -10,9 +20,18 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from sklearn.linear_model import SGDRegressor
+from sklearn.metrics import (
+    mean_absolute_error,
+    mean_squared_error,
+    r2_score,
+)
+from sklearn.preprocessing import StandardScaler
+
 try:
     from .help import Help
-except ImportError:  # Allows standalone testing, though package use is preferred.
+except ImportError:
+    # Fallback keeps the module importable if the shared Help class is unavailable.
     class Help:
         methods = {}
 
@@ -27,13 +46,13 @@ except ImportError:  # Allows standalone testing, though package use is preferre
 
 
 class SimpleLinearRegression(Help):
-    """Fit y = intercept + slope*x using batch gradient descent."""
+    """Fit y = intercept + slope*x using scikit-learn SGDRegressor."""
 
     methods = {
         "fit": {
-            "description": "Train simple linear regression with batch gradient descent.",
-            "parameters": "X, y, learning_rate=0.01, epochs=2000, tolerance=1e-10.",
-            "returns": "Self, with learned slope_, intercept_, and loss_history_.",
+            "description": "Train a one-feature linear model using stochastic gradient descent.",
+            "parameters": "X, y, learning_rate=0.01, epochs=2000, tolerance=1e-6, random_state=42.",
+            "returns": "Self, with slope_, intercept_, loss_history_, and sklearn_model_.",
             "example": "model.fit(X_train, y_train)"
         },
         "predict": {
@@ -43,15 +62,15 @@ class SimpleLinearRegression(Help):
             "example": "y_pred = model.predict(X_test)"
         },
         "evaluate": {
-            "description": "Calculate MAE, MSE, RMSE, R-squared, and adjusted R-squared.",
+            "description": "Calculate MAE, MSE, RMSE, R-squared, and adjusted R-squared with sklearn.metrics.",
             "parameters": "X, y_true.",
             "returns": "Dictionary of regression metrics.",
             "example": "metrics = model.evaluate(X_test, y_test)"
         },
         "metrics": {
-            "description": "Calculate regression metrics from true and predicted values.",
+            "description": "Calculate regression metrics from true and predicted values using sklearn.metrics.",
             "parameters": "y_true, y_pred, n_features=1.",
-            "returns": "Dictionary with MAE, MSE, RMSE, R-squared, adjusted R-squared.",
+            "returns": "Dictionary containing MAE, MSE, RMSE, R2, and Adjusted_R2.",
             "example": "model.metrics(y_test, y_pred)"
         },
         "residuals": {
@@ -67,9 +86,9 @@ class SimpleLinearRegression(Help):
             "example": "model.plot_regression(X_train, y_train)"
         },
         "plot_loss": {
-            "description": "Plot training MSE by gradient-descent epoch.",
-            "parameters": "log_y=False.",
-            "returns": "Displays a Matplotlib plot.",
+            "description": "Plot the SGD training loss across epochs.",
+            "parameters": "No parameters.",
+            "returns": "Displays a loss plot using loss_curve_ from SGDRegressor.",
             "example": "model.plot_loss()"
         },
         "plot_residuals": {
@@ -81,6 +100,9 @@ class SimpleLinearRegression(Help):
     }
 
     def __init__(self):
+        self.sklearn_model_ = None
+        self.x_scaler_ = StandardScaler()
+        self.y_scaler_ = StandardScaler()
         self.slope_ = None
         self.intercept_ = None
         self.loss_history_ = []
@@ -109,9 +131,22 @@ class SimpleLinearRegression(Help):
             raise ValueError(f"{name} contains missing or infinite values. Clean them first.")
         return array
 
-    def fit(self, X, y, learning_rate=0.01, epochs=2000, tolerance=1e-10):
-        """Fit by gradient descent after scaling x and y internally for stability."""
-        x = self._as_1d(X, "X")
+    def fit(
+        self,
+        X,
+        y,
+        learning_rate=0.01,
+        epochs=2000,
+        tolerance=1e-6,
+        random_state=42,
+    ):
+        """Fit using sklearn SGDRegressor after standardizing X and y.
+
+        `learning_rate` is the SGD step size (`eta0`) when using the constant
+        learning-rate schedule. X and y are standardized for numerical stability;
+        predictions, slope_, and intercept_ are returned in original units.
+        """
+        x = self._as_1d(X, "X").reshape(-1, 1)
         target = self._as_1d(y, "y")
         if len(x) != len(target):
             raise ValueError("X and y must have the same number of rows.")
@@ -124,50 +159,52 @@ class SimpleLinearRegression(Help):
         if tolerance < 0:
             raise ValueError("tolerance cannot be negative.")
 
-        self.x_mean_ = float(np.mean(x))
-        self.x_scale_ = float(np.std(x))
-        self.y_mean_ = float(np.mean(target))
-        self.y_scale_ = float(np.std(target))
-
-        if self.x_scale_ == 0:
+        if np.std(x) == 0:
             raise ValueError("X has no variation; a regression slope cannot be learned.")
-        if self.y_scale_ == 0:
-            # Constant target: best predictions are the same constant.
-            self.slope_ = 0.0
-            self.intercept_ = self.y_mean_
-            self.loss_history_ = [0.0]
-            self.n_iter_ = 0
-            self._fitted = True
-            return self
 
-        xs = (x - self.x_mean_) / self.x_scale_
-        ys = (target - self.y_mean_) / self.y_scale_
-        m = len(xs)
-        weight = 0.0
-        bias = 0.0
+        self.x_scaler_ = StandardScaler()
+        self.y_scaler_ = StandardScaler()
+        x_scaled = self.x_scaler_.fit_transform(x)
+        y_scaled = self.y_scaler_.fit_transform(target.reshape(-1, 1)).ravel()
+
+        self.sklearn_model_ = SGDRegressor(
+            loss="squared_error",
+            penalty=None,
+            learning_rate="constant",
+            eta0=learning_rate,
+            max_iter=1,
+            tol=None,
+            random_state=random_state,
+            shuffle=True,
+            fit_intercept=True,
+            average=False,
+            warm_start=True,
+        )
         self.loss_history_ = []
         previous_loss = None
-
+        self.n_iter_ = 0
+        # partial_fit performs one SGD training pass each time. Keeping the loop
+        # here lets us record a comparable standardized-target MSE each epoch.
         for epoch in range(epochs):
-            predictions = weight * xs + bias
-            errors = predictions - ys
-            # Gradients of mean squared error J = (1/m) * sum((prediction - y)^2).
-            dw = (2.0 / m) * np.dot(xs, errors)
-            db = (2.0 / m) * np.sum(errors)
-            weight -= learning_rate * dw
-            bias -= learning_rate * db
-
-            current_scaled_pred = weight * xs + bias
-            current_loss = float(np.mean((current_scaled_pred - ys) ** 2))
+            self.sklearn_model_.partial_fit(x_scaled, y_scaled)
+            epoch_predictions = self.sklearn_model_.predict(x_scaled)
+            current_loss = float(mean_squared_error(y_scaled, epoch_predictions))
             self.loss_history_.append(current_loss)
             self.n_iter_ = epoch + 1
             if previous_loss is not None and abs(previous_loss - current_loss) <= tolerance:
                 break
             previous_loss = current_loss
 
-        # Convert learned standardized-space coefficients back to original units.
-        self.slope_ = float(weight * self.y_scale_ / self.x_scale_)
-        self.intercept_ = float(self.y_mean_ + self.y_scale_ * bias - self.slope_ * self.x_mean_)
+        # Convert standardized-space coefficient back to original data units.
+        scaled_slope = float(self.sklearn_model_.coef_[0])
+        self.slope_ = float(
+            scaled_slope * self.y_scaler_.scale_[0] / self.x_scaler_.scale_[0]
+        )
+        self.intercept_ = float(
+            self.y_scaler_.mean_[0]
+            + self.y_scaler_.scale_[0] * self.sklearn_model_.intercept_[0]
+            - self.slope_ * self.x_scaler_.mean_[0]
+        )
         self._fitted = True
         return self
 
@@ -177,22 +214,23 @@ class SimpleLinearRegression(Help):
 
     def predict(self, X):
         self._require_fitted()
-        x = self._as_1d(X, "X")
-        return self.intercept_ + self.slope_ * x
+        x = self._as_1d(X, "X").reshape(-1, 1)
+        x_scaled = self.x_scaler_.transform(x)
+        y_scaled_pred = self.sklearn_model_.predict(x_scaled).reshape(-1, 1)
+        return self.y_scaler_.inverse_transform(y_scaled_pred).ravel()
 
     @staticmethod
     def metrics(y_true, y_pred, n_features=1):
-        """Compute common regression metrics; R² can be negative on test data."""
+        """Compute regression metrics with sklearn.metrics."""
         actual = SimpleLinearRegression._as_1d(y_true, "y_true")
         predicted = SimpleLinearRegression._as_1d(y_pred, "y_pred")
         if len(actual) != len(predicted):
             raise ValueError("y_true and y_pred must have the same number of rows.")
-        residual = actual - predicted
-        mae = float(np.mean(np.abs(residual)))
-        mse = float(np.mean(residual ** 2))
+
+        mae = float(mean_absolute_error(actual, predicted))
+        mse = float(mean_squared_error(actual, predicted))
         rmse = float(np.sqrt(mse))
-        denominator = float(np.sum((actual - np.mean(actual)) ** 2))
-        r2 = float(1.0 - np.sum(residual ** 2) / denominator) if denominator > 0 else float("nan")
+        r2 = float(r2_score(actual, predicted)) if len(actual) >= 2 else float("nan")
         n = len(actual)
         adjusted_r2 = (
             float(1.0 - (1.0 - r2) * (n - 1) / (n - n_features - 1))
@@ -204,7 +242,7 @@ class SimpleLinearRegression(Help):
             "MSE": mse,
             "RMSE": rmse,
             "R2": r2,
-            "Adjusted_R2": adjusted_r2
+            "Adjusted_R2": adjusted_r2,
         }
 
     def evaluate(self, X, y_true):
@@ -219,6 +257,10 @@ class SimpleLinearRegression(Help):
             raise ValueError("X and y_true must have the same number of rows.")
         return actual - predicted
 
+    def equation(self, x_symbol="x"):
+        self._require_fitted()
+        return f"y_hat = {self.intercept_:.6g} + ({self.slope_:.6g} * {x_symbol})"
+
     def plot_regression(self, X, y, title="Simple Linear Regression"):
         x = self._as_1d(X, "X")
         actual = self._as_1d(y, "y")
@@ -227,7 +269,7 @@ class SimpleLinearRegression(Help):
         order = np.argsort(x)
         plt.figure(figsize=(8, 5))
         plt.scatter(x, actual, label="Observed data")
-        plt.plot(x[order], self.predict(x[order]), label="Gradient-descent line")
+        plt.plot(x[order], self.predict(x[order]), label="scikit-learn SGD regression line")
         plt.xlabel("X")
         plt.ylabel("y")
         plt.title(title)
@@ -235,15 +277,13 @@ class SimpleLinearRegression(Help):
         plt.tight_layout()
         plt.show()
 
-    def plot_loss(self, log_y=False):
+    def plot_loss(self):
         self._require_fitted()
         plt.figure(figsize=(8, 5))
         plt.plot(np.arange(1, len(self.loss_history_) + 1), self.loss_history_)
         plt.xlabel("Epoch")
-        plt.ylabel("Scaled training MSE")
-        plt.title("Gradient Descent Convergence")
-        if log_y:
-            plt.yscale("log")
+        plt.ylabel("Training loss (standardized target)")
+        plt.title("scikit-learn SGDRegressor Loss Curve")
         plt.tight_layout()
         plt.show()
 
@@ -258,7 +298,3 @@ class SimpleLinearRegression(Help):
         plt.title("Residual Plot")
         plt.tight_layout()
         plt.show()
-
-    def equation(self, x_symbol="x"):
-        self._require_fitted()
-        return f"y_hat = {self.intercept_:.6g} + ({self.slope_:.6g} * {x_symbol})"
